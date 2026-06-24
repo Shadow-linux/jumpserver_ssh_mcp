@@ -6,6 +6,7 @@ from ssh_assist_mcp.jumpserver_accounts import (
     _parse_account_options,
     _select_account_id,
 )
+from ssh_assist_mcp.gateway import _clean_gateway_output
 from ssh_assist_mcp.matchers import MatcherRegistry
 
 
@@ -193,6 +194,33 @@ class JumpServerAccountSelectionTest(unittest.TestCase):
         self.assertEqual([step["action"]["type"] for step in steps], ["send_text", "send_text", "shell_reached"])
         self.assertEqual(steps[-1]["last_state"], "shell")
         self.assertEqual(child.sent, ["10.211.4.113\r", "1\r"])
+
+    def test_clean_gateway_output_filters_standalone_quote_echo(self):
+        output = """
+'
+__SSH_ASSIST_DONE_demo__:BEGIN
+'
+== downloads dir ==
+total 2.4G
+__SSH_ASSIST_DONE_demo__:END:0
+"""
+
+        cleaned = _clean_gateway_output(output, "ls -lah /data/downloads", "__SSH_ASSIST_DONE_demo__")
+
+        self.assertEqual(cleaned, "== downloads dir ==\ntotal 2.4G\n")
+
+    def test_clean_gateway_output_filters_escaped_newline_quote_echo(self):
+        output = """
+__SSH_ASSIST_DONE_demo__:BEGIN
+\\n'
+ok
+Wed Jun 24 08:58:40 PM CST 2026
+__SSH_ASSIST_DONE_demo__:END:0
+"""
+
+        cleaned = _clean_gateway_output(output, "echo ok; date", "__SSH_ASSIST_DONE_demo__")
+
+        self.assertEqual(cleaned, "ok\nWed Jun 24 08:58:40 PM CST 2026\n")
 
 
 class FakeChild:

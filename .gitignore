@@ -11,6 +11,7 @@ dist/
 *.egg-info/
 
 logs/
+logs/*.jsonl
 *.log
 
 config/*.bak

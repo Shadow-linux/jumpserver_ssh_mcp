@@ -235,7 +235,7 @@ def _clean_gateway_output(stdout: str, command: str, sentinel: str) -> str:
             continue
         if _looks_like_shell_prompt_line(stripped):
             continue
-        if stripped in {"(", ")"} or stripped in command_lines:
+        if _looks_like_shell_syntax_echo(stripped) or stripped in command_lines:
             continue
         if stripped.startswith("> "):
             continue
@@ -267,3 +267,8 @@ def _looks_like_shell_prompt_line(value: str) -> bool:
 
 def _looks_like_prompt_echo(value: str) -> bool:
     return bool(re.match(r"^[\w.@:/~\-\[\]() ]+[$#>]\s+", value))
+
+
+def _looks_like_shell_syntax_echo(value: str) -> bool:
+    normalized = re.sub(r"^(?:\\n)+", "", value)
+    return normalized in {"'", '"', "`", "(", ")"}
