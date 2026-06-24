@@ -1,0 +1,14 @@
+{
+  "name": "example-declarative",
+  "target_prompt_patterns": [
+    "(?i)input.*(host|ip)",
+    "请输入.*(主机|资产|IP)"
+  ],
+  "account_prompt_patterns": [
+    "(?i)account.*id",
+    "账号.*ID"
+  ],
+  "shell_prompt_patterns": [
+    "[$#>]\\\\s*$"
+  ]
+}

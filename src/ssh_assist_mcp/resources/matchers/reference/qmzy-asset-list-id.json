@@ -1,0 +1,14 @@
+{
+  "name": "qmzy-asset-list-id",
+  "menu_prompt_patterns": [
+    "Opt>\\s*$"
+  ],
+  "menu_action_value": "p",
+  "target_prompt_patterns": [
+    "\\[Host\\]>\\s*$"
+  ],
+  "shell_prompt_patterns": [
+    "[$#>]\\s*$",
+    "\\w+@[-\\w]+:[^\\r\\n]*$"
+  ]
+}

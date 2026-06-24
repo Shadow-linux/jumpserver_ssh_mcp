@@ -1,93 +1,214 @@
-# jumpserver_ssh_mcp
+# jumpserver-ssh-mcp
 
+`jumpserver-ssh-mcp` 是一个 MCP Server，用来让 Agent 通过直连 SSH 或 JumpServer 入口安全地执行远程命令。
 
+产品方向是 **MCP only**：
 
-## Getting started
+- `gateway` 表示一个 JumpServer / 环境入口。
+- 入口匹配插件负责适配不同 JumpServer 交互界面。
+- 到达目标机器 shell 后，继续复用现有 SSH 执行、安全检查、审计和输出收集机制。
+- 不新增 CLI 产品工作流；仓库里保留的 CLI 只用于兼容和本地 smoke check。
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## 当前状态
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+这个项目原来是 `ssh-assist-mcp` 原型，已经具备：
 
-## Add your files
+- `ssh.run_command`
+- `ssh.run_script`
+- `ssh.rsync_upload`
+- `ssh.rsync_download`
+- 基础安全策略和审计日志
+- 基础 JumpServer 交互式 gateway 执行
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+现在要产品化的是 JumpServer 入口层：
 
+- matcher plugin 契约和 registry
+- 内置通用 JumpServer matcher
+- 用户自写声明式 matcher
+- 多 JumpServer / 多环境 gateway 自由切换
+- MCP resources 暴露 matcher 编写文档、示例、schema、排障说明
+- README 和 `docs/install/*` 提供 Codex、Kimi CLI、opencode 安装入口
+
+## 安装入口
+
+安装文档是普通仓库文件，所以 **MCP 还没装好之前也能看**：
+
+- [任意 Agent 安装 MCP](docs/install/agent.md)
+- [Codex 安装配置](docs/install/codex.md)
+- [Kimi CLI 安装配置](docs/install/kimi-cli.md)
+- [opencode 安装配置](docs/install/opencode.md)
+
+推荐顺序：
+
+1. 先按 [任意 Agent 安装 MCP](docs/install/agent.md) 把 `jumpserver-ssh-mcp` 接入 Agent 客户端。
+2. 再让 Agent 安装或读取 `skills/jumpserver-agent-skill`。
+3. Agent 按 skill 创建 profile、配置 gateway、probe、smoke test，必要时编写 matcher。
+
+MCP 安装完成后，Agent 可以再通过 MCP resources 读取运行时文档，例如 matcher 编写指南、示例、schema 和 troubleshooting。
+
+## 快速初始化
+
+从源码安装时，先把项目拉到一个稳定目录：
+
+```bash
+git clone <repo-url> jumpserver_ssh_mcp
+cd jumpserver_ssh_mcp
 ```
-cd existing_repo
-git remote add origin http://124.174.38.59/infra/jumpserver_ssh_mcp.git
-git branch -M main
-git push -uf origin main
+
+创建虚拟环境并安装 MCP server：
+
+```bash
+uv venv
+uv pip install -e '.[mcp]'
 ```
 
-## Integrate with your tools
+确认启动命令存在：
 
-* [Set up project integrations](http://124.174.38.59/infra/jumpserver_ssh_mcp/-/settings/integrations)
+```bash
+.venv/bin/jumpserver-ssh-mcp
+```
 
-## Collaborate with your team
+准备本机 profile。可以复制发布样例：
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```bash
+cp config/example.yaml config/local.yaml
+```
 
-## Test and Deploy
+配置文件说明：
 
-Use the built-in continuous integration in GitLab.
+- `config/example.yaml`：推荐起步样例，只包含人类需要维护的最小字段。
+- `config/full-example.yaml`：完整参考样例，给 Agent 或高级用户查看所有可选字段。
+- `config/local.yaml`：本机真实配置，通常不提交。
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+然后把 `config/local.yaml` 改成真实 JumpServer：
 
-***
+```yaml
+gateways:
+  pro-jumpserver:
+    command: ssh -i ~/.ssh/pro.pem ops@jump.example.com -p2222
+    matcher: builtin-generic
+```
 
-# Editing this README
+在任意支持 MCP 的 Agent 客户端里配置：
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+```text
+server name: jumpserver-ssh-mcp
+command: /path/to/jumpserver_ssh_mcp/.venv/bin/jumpserver-ssh-mcp
+env.SSH_ASSIST_PROFILE: /path/to/jumpserver_ssh_mcp/config/local.yaml
+env.SSH_ASSIST_AUDIT_LOG: /path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audit.jsonl
+```
 
-## Suggestions for a good README
+配置后重启或 reload Agent 客户端，然后验证：
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```text
+ssh.matcher_list
+```
 
-## Name
-Choose a self-explaining name for your project.
+能看到 profile 里的 gateway，就说明 MCP 初始化完成。
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## Gateway 是环境入口
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+调用 MCP 工具时用 `gateway` 选择要进入哪个 JumpServer / 环境：
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```text
+gateway=prod-jumpserver  -> 生产 JumpServer / 环境
+gateway=test-jumpserver  -> 测试 JumpServer / 环境
+gateway=ops-jumpserver   -> 运维 JumpServer / 环境
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+建议运维类调用都显式传 `gateway`，这样审计日志能清楚记录 Agent 进入了哪个环境入口。
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+## Matcher 插件放在哪里
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+内置通用 matcher 和 reference matcher 会随 Python 包一起分发，安装后默认可用：
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+- `builtin-generic`
+- `ttyuyin-opt-account`
+- `qmzy-asset-list-id`
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+用户自写 matcher 推荐放在两类路径：
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+- 项目级：`matchers/custom/`
+- 用户级：例如 `~/.config/jumpserver-ssh-mcp/matchers/`
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+然后在 profile 中配置：
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```yaml
+matchers:
+  custom_dirs:
+    - matchers/custom
+    - ~/.config/jumpserver-ssh-mcp/matchers
+```
 
-## License
-For open source projects, say how it is licensed.
+每个 gateway 可以绑定自己的 matcher：
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```yaml
+default_gateway: jumpserver-test
+
+gateways:
+  jumpserver-test:
+    command: ssh -i ~/.ssh/jumpserver-test.pem ops@jump-test.example.com -p2222
+    matcher: builtin-generic
+```
+
+## Matcher 能做什么
+
+Matcher 只负责 JumpServer 登录入口匹配，不能执行目标机器命令。
+
+它可以返回这些动作：
+
+- 发送目标 host/IP
+- 从主机候选列表中选择目标
+- 从账号表中选择账号
+- 报告已经到达 shell
+- 报告未匹配，并返回脱敏 transcript 片段给 Agent 修插件
+
+远程命令仍由 `ssh.run_command` / `ssh.run_script` 统一执行。
+
+## MCP Tools
+
+已有 SSH tools：
+
+- `ssh.run_command`
+- `ssh.run_script`
+- `ssh.rsync_upload`
+- `ssh.rsync_download`
+
+Matcher tools：
+
+- `ssh.matcher_list`
+- `ssh.matcher_validate`
+- `ssh.matcher_probe`
+- `ssh.matcher_test_transcript`
+
+`ssh.matcher_probe` 只验证 matcher 能否通过 JumpServer 到达目标 shell，不执行目标机器命令。
+
+## 安全与审计
+
+远程命令会经过 `SafetyPolicy` 评估。
+
+高风险操作必须显式确认。审计日志默认写入 `logs/jumpserver-ssh-mcp-audit.jsonl`，也可以通过 `SSH_ASSIST_AUDIT_LOG` 指定。
+
+不要把私钥内容、明文密码、token 写进 profile、matcher、文档或审计日志。
+
+## 开发验证
+
+运行单元测试：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+```
+
+运行 MCP server：
+
+```bash
+SSH_ASSIST_PROFILE=config/example.yaml .venv/bin/jumpserver-ssh-mcp
+```
+
+旧原型入口 `ssh-assist-mcp` 暂时保留为兼容别名。
+
+构建 wheel：
+
+```bash
+uv build --wheel
+```

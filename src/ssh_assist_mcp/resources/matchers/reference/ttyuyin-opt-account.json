@@ -1,0 +1,13 @@
+{
+  "name": "ttyuyin-opt-account",
+  "target_prompt_patterns": [
+    "Opt>\\s*$"
+  ],
+  "account_prompt_patterns": [
+    "输入资产.*账号ID",
+    "ID>\\s*$"
+  ],
+  "shell_prompt_patterns": [
+    "[$#>]\\s*$"
+  ]
+}

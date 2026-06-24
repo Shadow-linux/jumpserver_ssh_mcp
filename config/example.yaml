@@ -1,0 +1,18 @@
+# Publishable example profile.
+# Humans only need to provide gateway name + JumpServer login command.
+
+default_gateway: jumpserver-test
+
+gateways:
+  jumpserver-test:
+    command: ssh -i ~/.ssh/jumpserver-test.pem ops@jump-test.example.com -p2222
+    matcher: builtin-generic
+
+  jumpserver-prod:
+    command: ssh -i ~/.ssh/jumpserver-prod.pem ops@jump-prod.example.com -p2222
+    matcher: builtin-generic
+
+matchers:
+  custom_dirs:
+    - matchers/custom
+    - ~/.config/jumpserver-ssh-mcp/matchers

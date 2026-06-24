@@ -1,0 +1,63 @@
+# Full reference profile.
+# This file documents all supported options for Agents and advanced users.
+# Most humans should start from config/example.yaml instead.
+
+default_gateway: jumpserver-test
+
+gateways:
+  jumpserver-test:
+    # Required. The SSH command used to log in to JumpServer.
+    command: ssh -i ~/.ssh/jumpserver-test.pem ops@jump-test.example.com -p2222
+
+    # Optional. Defaults to builtin-generic.
+    matcher: builtin-generic
+
+    # Optional. Use when JumpServer asks which asset account to use.
+    preferred_account: __su
+
+    # Optional. Explicit account ID by target host when display names are ambiguous.
+    account_id_by_host:
+      10.0.0.10: "2"
+
+    # Optional. Advanced compatibility fields. Usually Agent should not ask humans
+    # to fill these; matcher plugins handle most JumpServer UI differences.
+    type: interactive_expect
+    login_prompt_patterns:
+      - "(?i)password"
+      - "密码"
+    target_prompt_patterns:
+      - "(?i)host|ip|target|资产"
+    shell_prompt_patterns:
+      - "[$#>] "
+    account_prompt_patterns:
+      - "ID>\\s*"
+
+    # Optional timeouts and retry behavior.
+    connect_timeout: 30
+    command_timeout: 300
+    max_attempts: 2
+    retry_delay_seconds: 0.5
+
+    # Optional. Only use when the target shell needs a controlled privilege step.
+    # Do not configure this if the target account is already the required user.
+    privilege_escalation:
+      method: sudo_su
+      command: sudo su -
+      root_prompt_patterns:
+        - "# "
+      password_prompt_patterns:
+        - "(?i)password"
+        - "密码"
+      timeout: 30
+
+  jumpserver-prod:
+    command: ssh -i ~/.ssh/jumpserver-prod.pem ops@jump-prod.example.com -p2222
+    matcher: builtin-generic
+    preferred_account: root
+    command_timeout: 300
+
+matchers:
+  # Preferred key for new simple profiles.
+  custom_dirs:
+    - matchers/custom
+    - ~/.config/jumpserver-ssh-mcp/matchers

@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string" },
+    "menu_prompt_patterns": { "type": "array", "items": { "type": "string" } },
+    "menu_action_value": { "type": "string" },
+    "target_prompt_patterns": { "type": "array", "items": { "type": "string" } },
+    "host_candidate_patterns": { "type": "array", "items": { "type": "string" } },
+    "account_prompt_patterns": { "type": "array", "items": { "type": "string" } },
+    "shell_prompt_patterns": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

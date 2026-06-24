@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jumpserver-ssh-mcp"
+dynamic = ["version"]
+description = "MCP server for auditable SSH command execution through direct SSH or JumpServer-style gateways."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "PyYAML>=6.0",
+  "pexpect>=4.9",
+]
+
+[project.optional-dependencies]
+mcp = [
+  "mcp>=1.0",
+]
+
+[project.scripts]
+ssh-assist = "ssh_assist_mcp.cli:main"
+ssh-assist-mcp = "ssh_assist_mcp.server:main"
+jumpserver-ssh-mcp = "ssh_assist_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "ssh_assist_mcp.__version__"}
+
+[tool.setuptools.package-data]
+ssh_assist_mcp = ["resources/**/*.md", "resources/**/*.json"]

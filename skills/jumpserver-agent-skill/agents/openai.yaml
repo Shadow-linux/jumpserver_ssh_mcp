@@ -1,0 +1,4 @@
+interface:
+  display_name: "JumpServer Agent Skill"
+  short_description: "Configure and validate jumpserver-ssh-mcp gateways"
+  default_prompt: "Help me add a JumpServer gateway to jumpserver-ssh-mcp and verify it safely."
