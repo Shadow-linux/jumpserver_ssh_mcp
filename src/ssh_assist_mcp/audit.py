@@ -27,6 +27,11 @@ class AuditLogger:
         default_path = os.environ.get("SSH_ASSIST_AUDIT_LOG", "logs/jumpserver-ssh-mcp-audit.jsonl")
         self.path = Path(path or default_path)
 
+    def _path_for_day(self, day: str) -> Path:
+        if self.path.suffix:
+            return self.path.with_name(f"{self.path.stem}-{day}{self.path.suffix}")
+        return self.path.with_name(f"{self.path.name}-{day}")
+
     def record(
         self,
         tool: str,
@@ -36,9 +41,11 @@ class AuditLogger:
         status: str,
         error: Optional[str] = None,
     ) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        now = time.gmtime()
+        daily_path = self._path_for_day(time.strftime("%Y-%m-%d", now))
+        daily_path.parent.mkdir(parents=True, exist_ok=True)
         event = {
-            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", now),
             "tool": tool,
             "target": target,
             "risk_level": risk_level,
@@ -46,5 +53,5 @@ class AuditLogger:
             "status": status,
             "error": error,
         }
-        with self.path.open("a", encoding="utf-8") as handle:
+        with daily_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")

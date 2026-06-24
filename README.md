@@ -187,7 +187,7 @@ Matcher tools：
 
 远程命令会经过 `SafetyPolicy` 评估。
 
-高风险操作必须显式确认。审计日志默认写入 `logs/jumpserver-ssh-mcp-audit.jsonl`，也可以通过 `SSH_ASSIST_AUDIT_LOG` 指定。
+高风险操作必须显式确认。审计日志基础路径默认是 `logs/jumpserver-ssh-mcp-audit.jsonl`，也可以通过 `SSH_ASSIST_AUDIT_LOG` 指定；实际写入时会按 UTC 日期滚动为 `logs/jumpserver-ssh-mcp-audit-YYYY-MM-DD.jsonl`。
 
 不要把私钥内容、明文密码、token 写进 profile、matcher、文档或审计日志。
 

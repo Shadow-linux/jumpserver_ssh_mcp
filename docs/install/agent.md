@@ -74,6 +74,8 @@ env.SSH_ASSIST_PROFILE: /path/to/jumpserver_ssh_mcp/config/local.yaml
 env.SSH_ASSIST_AUDIT_LOG: /path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audit.jsonl
 ```
 
+`SSH_ASSIST_AUDIT_LOG` 是审计日志基础路径；运行时会按 UTC 日期写入 `jumpserver-ssh-mcp-audit-YYYY-MM-DD.jsonl`。
+
 不同客户端只是配置文件格式不同。
 
 ## 4. Codex 示例
