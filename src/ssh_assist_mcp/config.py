@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from .errors import ToolExecutionError
+from .paths import default_profile_candidates
 
 
 @dataclass
@@ -78,7 +79,7 @@ class SSHConfig:
 
 
 def load_ssh_config(path: Optional[str] = None) -> SSHConfig:
-    profile_path = Path(path or os.environ.get("SSH_ASSIST_PROFILE", "config/example.yaml"))
+    profile_path = _resolve_profile_path(path)
     if not profile_path.exists():
         return SSHConfig(gateways={}, matcher_search_paths=[])
     try:
@@ -90,6 +91,16 @@ def load_ssh_config(path: Optional[str] = None) -> SSHConfig:
     if not isinstance(data, dict):
         return SSHConfig(gateways={}, matcher_search_paths=[])
     return SSHConfig.from_profile(data)
+
+
+def _resolve_profile_path(path: Optional[str] = None) -> Path:
+    explicit_path = path or os.environ.get("SSH_ASSIST_PROFILE")
+    if explicit_path:
+        return Path(explicit_path)
+    for candidate in default_profile_candidates():
+        if candidate.exists():
+            return candidate
+    return default_profile_candidates()[0]
 
 
 def _gateway_configs(raw_gateways: object) -> Dict[str, GatewayConfig]:

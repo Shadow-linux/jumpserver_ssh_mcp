@@ -29,7 +29,7 @@ Agent-owned outputs:
 - custom matcher JSON when built-in matchers fail
 - probe and smoke-test evidence
 
-Built-in matchers are packaged inside `jumpserver-ssh-mcp` and are available after installation. Agent-authored matchers should be written only to configured custom matcher directories, usually `matchers/custom/` for a project or `~/.config/jumpserver-ssh-mcp/matchers/` for a user.
+Built-in matchers are packaged inside `jumpserver-ssh-mcp` and are available after installation. Agent-authored matchers should be written only to configured custom matcher directories, usually `~/jumpserver-ssh-mcp/matchers/`.
 
 ## Required Inputs
 

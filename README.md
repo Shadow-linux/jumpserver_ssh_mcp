@@ -68,19 +68,20 @@ uv pip install -e '.[mcp]'
 .venv/bin/jumpserver-ssh-mcp
 ```
 
-准备本机 profile。可以复制发布样例：
+准备本机 profile。运行期文件统一放在用户目录，避免更新源码仓库时覆盖本机配置：
 
 ```bash
-cp config/example.yaml config/local.yaml
+mkdir -p ~/jumpserver-ssh-mcp/{config,logs,matchers}
+cp config/example.yaml ~/jumpserver-ssh-mcp/config/local.yaml
 ```
 
 配置文件说明：
 
 - `config/example.yaml`：推荐起步样例，只包含人类需要维护的最小字段。
 - `config/full-example.yaml`：完整参考样例，给 Agent 或高级用户查看所有可选字段。
-- `config/local.yaml`：本机真实配置，通常不提交。
+- `~/jumpserver-ssh-mcp/config/local.yaml`：本机真实配置，不放在源码仓库里。
 
-然后把 `config/local.yaml` 改成真实 JumpServer：
+然后把 `~/jumpserver-ssh-mcp/config/local.yaml` 改成真实 JumpServer：
 
 ```yaml
 gateways:
@@ -94,8 +95,8 @@ gateways:
 ```text
 server name: jumpserver-ssh-mcp
 command: /path/to/jumpserver_ssh_mcp/.venv/bin/jumpserver-ssh-mcp
-env.SSH_ASSIST_PROFILE: /path/to/jumpserver_ssh_mcp/config/local.yaml
-env.SSH_ASSIST_AUDIT_LOG: /path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audit.jsonl
+env.SSH_ASSIST_PROFILE: /Users/you/jumpserver-ssh-mcp/config/local.yaml
+env.SSH_ASSIST_AUDIT_LOG: /Users/you/jumpserver-ssh-mcp/logs/jumpserver-ssh-mcp-audit.jsonl
 ```
 
 配置后重启或 reload Agent 客户端，然后验证：
@@ -105,6 +106,23 @@ ssh.matcher_list
 ```
 
 能看到 profile 里的 gateway，就说明 MCP 初始化完成。
+
+## 从 v0.1.0 升级
+
+`0.2.1` 起推荐把运行期文件放到 `~/jumpserver-ssh-mcp/`。如果旧版本已经在 MCP 客户端里显式配置了 `SSH_ASSIST_PROFILE`，升级后会继续优先使用这个路径。
+
+如果旧配置还在源码仓库里，可以迁移一份：
+
+```bash
+mkdir -p ~/jumpserver-ssh-mcp/{config,logs,matchers}
+cp config/local.yaml ~/jumpserver-ssh-mcp/config/local.yaml
+```
+
+为了兼容旧安装，无显式 `SSH_ASSIST_PROFILE` 时会按顺序查找：
+
+1. `~/jumpserver-ssh-mcp/config/local.yaml`
+2. `config/local.yaml`
+3. `config/example.yaml`
 
 ## Gateway 是环境入口
 
@@ -126,18 +144,16 @@ gateway=ops-jumpserver   -> 运维 JumpServer / 环境
 - `ttyuyin-opt-account`
 - `qmzy-asset-list-id`
 
-用户自写 matcher 推荐放在两类路径：
+用户自写 matcher 推荐放在用户运行目录：
 
-- 项目级：`matchers/custom/`
-- 用户级：例如 `~/.config/jumpserver-ssh-mcp/matchers/`
+- 用户运行目录：`~/jumpserver-ssh-mcp/matchers/`
 
 然后在 profile 中配置：
 
 ```yaml
 matchers:
   custom_dirs:
-    - matchers/custom
-    - ~/.config/jumpserver-ssh-mcp/matchers
+    - ~/jumpserver-ssh-mcp/matchers
 ```
 
 每个 gateway 可以绑定自己的 matcher：
@@ -187,7 +203,7 @@ Matcher tools：
 
 远程命令会经过 `SafetyPolicy` 评估。
 
-高风险操作必须显式确认。审计日志基础路径默认是 `logs/jumpserver-ssh-mcp-audit.jsonl`，也可以通过 `SSH_ASSIST_AUDIT_LOG` 指定；实际写入时会按 UTC 日期滚动为 `logs/jumpserver-ssh-mcp-audit-YYYY-MM-DD.jsonl`。
+高风险操作必须显式确认。审计日志基础路径默认是 `~/jumpserver-ssh-mcp/logs/jumpserver-ssh-mcp-audit.jsonl`，也可以通过 `SSH_ASSIST_AUDIT_LOG` 指定；实际写入时会按 UTC 日期滚动为 `~/jumpserver-ssh-mcp/logs/jumpserver-ssh-mcp-audit-YYYY-MM-DD.jsonl`。
 
 不要把私钥内容、明文密码、token 写进 profile、matcher、文档或审计日志。
 

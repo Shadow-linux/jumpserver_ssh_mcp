@@ -4,6 +4,8 @@ Use this when creating or updating the file referenced by `SSH_ASSIST_PROFILE`.
 
 Start from `config/example.yaml` for normal onboarding. Use `config/full-example.yaml` only when the Agent needs to inspect all supported fields or maintain legacy compatibility options.
 
+For v0.1.0 upgrades, check whether the human already has a repo-local `config/local.yaml` or an existing `SSH_ASSIST_PROFILE`. Preserve that working profile first, then migrate a copy to `/Users/you/jumpserver-ssh-mcp/config/local.yaml` when the human wants the new runtime layout.
+
 ## Product-Facing Shape
 
 Keep human-maintained profiles small:
@@ -18,7 +20,7 @@ gateways:
 
 matchers:
   custom_dirs:
-    - ~/.config/jumpserver-ssh-mcp/matchers
+    - ~/jumpserver-ssh-mcp/matchers
 ```
 
 Required per gateway:
@@ -42,15 +44,14 @@ Do not create or edit packaged reference matcher files. Those are owned by `jump
 
 When the Agent needs to author a new matcher, write it to one configured custom directory:
 
-- project-level: `matchers/custom/`
-- user-level: `~/.config/jumpserver-ssh-mcp/matchers/`
+- user runtime directory: `~/jumpserver-ssh-mcp/matchers/`
 
 If the profile does not already include a custom matcher directory, add:
 
 ```yaml
 matchers:
   custom_dirs:
-    - ~/.config/jumpserver-ssh-mcp/matchers
+    - ~/jumpserver-ssh-mcp/matchers
 ```
 
 ## What Not To Ask Humans To Fill

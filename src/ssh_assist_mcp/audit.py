@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from .paths import default_audit_log_path
+
 SENSITIVE_KEYS = {"password", "passwd", "token", "secret", "private_key", "key", "dsn"}
 
 
@@ -24,7 +26,7 @@ def redact(value: Any) -> Any:
 
 class AuditLogger:
     def __init__(self, path: Optional[str] = None) -> None:
-        default_path = os.environ.get("SSH_ASSIST_AUDIT_LOG", "logs/jumpserver-ssh-mcp-audit.jsonl")
+        default_path = os.environ.get("SSH_ASSIST_AUDIT_LOG") or default_audit_log_path()
         self.path = Path(path or default_path)
 
     def _path_for_day(self, day: str) -> Path:

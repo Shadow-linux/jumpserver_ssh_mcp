@@ -48,6 +48,16 @@ class AuditLoggerTest(unittest.TestCase):
             self.assertTrue((Path(temp_dir) / "audit-2026-06-24.jsonl").exists())
             self.assertTrue((Path(temp_dir) / "audit-2026-06-25.jsonl").exists())
 
+    def test_default_log_path_uses_user_runtime_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.dict("os.environ", {}, clear=True), patch("ssh_assist_mcp.paths.Path.home", return_value=Path(temp_dir)):
+                logger = AuditLogger()
+
+            self.assertEqual(
+                logger.path,
+                Path(temp_dir) / "jumpserver-ssh-mcp" / "logs" / "jumpserver-ssh-mcp-audit.jsonl",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

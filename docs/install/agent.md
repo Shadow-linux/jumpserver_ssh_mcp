@@ -42,10 +42,17 @@ config/example.yaml
 config/full-example.yaml
 ```
 
-本机真实配置建议放：
+本机真实配置建议放在用户运行目录，避免源码仓库更新时被覆盖：
 
 ```text
-config/local.yaml
+/Users/you/jumpserver-ssh-mcp/config/local.yaml
+```
+
+可以先创建目录并复制样例：
+
+```bash
+mkdir -p /Users/you/jumpserver-ssh-mcp/{config,logs,matchers}
+cp config/example.yaml /Users/you/jumpserver-ssh-mcp/config/local.yaml
 ```
 
 最小格式：
@@ -63,6 +70,18 @@ gateways:
 preferred_account: __su
 ```
 
+## v0.1.0 升级兼容
+
+如果旧版本已经在 Agent 客户端里显式配置了 `SSH_ASSIST_PROFILE`，更新后仍会优先使用这个路径。
+
+无显式 `SSH_ASSIST_PROFILE` 时，MCP 会按顺序查找：
+
+1. `/Users/you/jumpserver-ssh-mcp/config/local.yaml`
+2. 当前项目里的 `config/local.yaml`
+3. 当前项目里的 `config/example.yaml`
+
+建议把旧的 `config/local.yaml` 复制到用户运行目录，再把 MCP 客户端配置切到新路径。
+
 ## 3. MCP 客户端配置模型
 
 所有 Agent 客户端最终都要表达同一组信息：
@@ -70,8 +89,8 @@ preferred_account: __su
 ```text
 server name: jumpserver-ssh-mcp
 command: /path/to/jumpserver_ssh_mcp/.venv/bin/jumpserver-ssh-mcp
-env.SSH_ASSIST_PROFILE: /path/to/jumpserver_ssh_mcp/config/local.yaml
-env.SSH_ASSIST_AUDIT_LOG: /path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audit.jsonl
+env.SSH_ASSIST_PROFILE: /Users/you/jumpserver-ssh-mcp/config/local.yaml
+env.SSH_ASSIST_AUDIT_LOG: /Users/you/jumpserver-ssh-mcp/logs/jumpserver-ssh-mcp-audit.jsonl
 ```
 
 `SSH_ASSIST_AUDIT_LOG` 是审计日志基础路径；运行时会按 UTC 日期写入 `jumpserver-ssh-mcp-audit-YYYY-MM-DD.jsonl`。
@@ -87,8 +106,8 @@ env.SSH_ASSIST_AUDIT_LOG: /path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-au
 command = "/path/to/jumpserver_ssh_mcp/.venv/bin/jumpserver-ssh-mcp"
 
 [mcp_servers.jumpserver-ssh-mcp.env]
-SSH_ASSIST_PROFILE = "/path/to/jumpserver_ssh_mcp/config/local.yaml"
-SSH_ASSIST_AUDIT_LOG = "/path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audit.jsonl"
+SSH_ASSIST_PROFILE = "/Users/you/jumpserver-ssh-mcp/config/local.yaml"
+SSH_ASSIST_AUDIT_LOG = "/Users/you/jumpserver-ssh-mcp/logs/jumpserver-ssh-mcp-audit.jsonl"
 ```
 
 改完后重启 Codex 或新开线程。
@@ -105,8 +124,8 @@ SSH_ASSIST_AUDIT_LOG = "/path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audi
     "jumpserver-ssh-mcp": {
       "command": "/path/to/jumpserver_ssh_mcp/.venv/bin/jumpserver-ssh-mcp",
       "env": {
-        "SSH_ASSIST_PROFILE": "/path/to/jumpserver_ssh_mcp/config/local.yaml",
-        "SSH_ASSIST_AUDIT_LOG": "/path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audit.jsonl"
+        "SSH_ASSIST_PROFILE": "/Users/you/jumpserver-ssh-mcp/config/local.yaml",
+        "SSH_ASSIST_AUDIT_LOG": "/Users/you/jumpserver-ssh-mcp/logs/jumpserver-ssh-mcp-audit.jsonl"
       }
     }
   }
@@ -121,8 +140,8 @@ SSH_ASSIST_AUDIT_LOG = "/path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audi
     "jumpserver-ssh-mcp": {
       "command": "/path/to/jumpserver_ssh_mcp/.venv/bin/jumpserver-ssh-mcp",
       "env": {
-        "SSH_ASSIST_PROFILE": "/path/to/jumpserver_ssh_mcp/config/local.yaml",
-        "SSH_ASSIST_AUDIT_LOG": "/path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audit.jsonl"
+        "SSH_ASSIST_PROFILE": "/Users/you/jumpserver-ssh-mcp/config/local.yaml",
+        "SSH_ASSIST_AUDIT_LOG": "/Users/you/jumpserver-ssh-mcp/logs/jumpserver-ssh-mcp-audit.jsonl"
       }
     }
   }
@@ -134,8 +153,8 @@ SSH_ASSIST_AUDIT_LOG = "/path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audi
 先用同样的环境变量直接启动 server，确认不会立刻报错：
 
 ```bash
-SSH_ASSIST_PROFILE=/path/to/jumpserver_ssh_mcp/config/local.yaml \
-SSH_ASSIST_AUDIT_LOG=/path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audit.jsonl \
+SSH_ASSIST_PROFILE=/Users/you/jumpserver-ssh-mcp/config/local.yaml \
+SSH_ASSIST_AUDIT_LOG=/Users/you/jumpserver-ssh-mcp/logs/jumpserver-ssh-mcp-audit.jsonl \
 /path/to/jumpserver_ssh_mcp/.venv/bin/jumpserver-ssh-mcp
 ```
 

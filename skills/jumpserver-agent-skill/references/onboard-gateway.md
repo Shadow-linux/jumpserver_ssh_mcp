@@ -15,7 +15,7 @@ gateways:
 
 matchers:
   custom_dirs:
-    - ~/.config/jumpserver-ssh-mcp/matchers
+    - ~/jumpserver-ssh-mcp/matchers
 ```
 
 ## Onboarding Sequence

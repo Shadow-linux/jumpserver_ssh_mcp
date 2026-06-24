@@ -17,7 +17,7 @@ class PackagingMetadataTest(unittest.TestCase):
         pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
         pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(__version__, "0.2.0")
+        self.assertEqual(__version__, "0.2.1")
         self.assertNotIn("version", pyproject["project"])
         self.assertEqual(pyproject["project"]["dynamic"], ["version"])
         self.assertEqual(

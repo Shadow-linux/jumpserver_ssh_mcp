@@ -13,8 +13,8 @@
 command = "/path/to/jumpserver_ssh_mcp/.venv/bin/jumpserver-ssh-mcp"
 
 [mcp_servers.jumpserver-ssh-mcp.env]
-SSH_ASSIST_PROFILE = "/path/to/jumpserver_ssh_mcp/config/local.yaml"
-SSH_ASSIST_AUDIT_LOG = "/path/to/jumpserver_ssh_mcp/logs/jumpserver-ssh-mcp-audit.jsonl"
+SSH_ASSIST_PROFILE = "/Users/you/jumpserver-ssh-mcp/config/local.yaml"
+SSH_ASSIST_AUDIT_LOG = "/Users/you/jumpserver-ssh-mcp/logs/jumpserver-ssh-mcp-audit.jsonl"
 ```
 
 配置后重启或 reload Codex。

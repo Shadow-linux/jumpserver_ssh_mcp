@@ -13,8 +13,7 @@ Matcher 插件用于适配 JumpServer 入口界面。它只处理登录交互，
 ```yaml
 matchers:
   custom_dirs:
-    - matchers/custom
-    - ~/.config/jumpserver-ssh-mcp/matchers
+    - ~/jumpserver-ssh-mcp/matchers
 ```
 
 不要修改 MCP 包内置的 reference matcher 文件。
@@ -68,13 +67,12 @@ Matcher 不能返回“执行远程命令”动作。
 }
 ```
 
-把文件放到 `matchers/custom/` 或 `~/.config/jumpserver-ssh-mcp/matchers/`，并在 profile 中配置：
+把文件放到 `~/jumpserver-ssh-mcp/matchers/`，并在 profile 中配置：
 
 ```yaml
 matchers:
   custom_dirs:
-    - matchers/custom
-    - ~/.config/jumpserver-ssh-mcp/matchers
+    - ~/jumpserver-ssh-mcp/matchers
 ```
 
 ## 验证流程

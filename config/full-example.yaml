@@ -59,5 +59,4 @@ gateways:
 matchers:
   # Preferred key for new simple profiles.
   custom_dirs:
-    - matchers/custom
-    - ~/.config/jumpserver-ssh-mcp/matchers
+    - ~/jumpserver-ssh-mcp/matchers
