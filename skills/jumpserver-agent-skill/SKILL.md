@@ -64,6 +64,8 @@ Optional:
 - Do not run destructive commands during onboarding. Use read-only smoke commands.
 - Treat production gateways as explicit human-gated environments.
 - If `ssh.run_command` reports a safety confirmation requirement, stop and ask the human before continuing.
+- For single-file transfer through JumpServer, use `ssh.file_push` / `ssh.file_pull`; do not use `ssh.rsync_upload` / `ssh.rsync_download` with `connection_mode: gateway`.
+- Keep `ssh.file_push` / `ssh.file_pull` to files up to 50MB. For larger artifacts, prefer remote `curl` / `wget`, object storage, or direct SSH rsync when available.
 
 ## MCP Docs To Read When Needed
 

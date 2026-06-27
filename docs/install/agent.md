@@ -167,6 +167,8 @@ ssh.matcher_probe
 ssh.matcher_test_transcript
 ssh.run_command
 ssh.run_script
+ssh.file_push
+ssh.file_pull
 ```
 
 确认能读取资源：

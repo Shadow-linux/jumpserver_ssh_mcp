@@ -12,6 +12,8 @@ from ssh_assist_mcp.server import (
     ssh_matcher_probe,
     ssh_matcher_test_transcript,
     ssh_matcher_validate,
+    ssh_file_pull,
+    ssh_file_push,
 )
 
 
@@ -54,6 +56,8 @@ class ServerMatcherToolsTest(unittest.TestCase):
         register_resources(fake)
 
         self.assertIn("ssh.run_command", fake.tools)
+        self.assertIn("ssh.file_push", fake.tools)
+        self.assertIn("ssh.file_pull", fake.tools)
         self.assertIn("ssh.matcher_list", fake.tools)
         self.assertIn("ssh.matcher_probe", fake.tools)
         self.assertIn("jumpserver-ssh-mcp://docs/matchers/guide", fake.resources)
@@ -87,6 +91,37 @@ class ServerMatcherToolsTest(unittest.TestCase):
 
         probe.assert_called_once_with("10.1.1.1", gateway="demo", timeout=10)
         self.assertEqual(result, expected)
+
+    def test_file_transfer_tools_call_tool(self):
+        with patch("ssh_assist_mcp.server.SSHTool.file_push", return_value={"direction": "push"}) as push:
+            self.assertEqual(
+                ssh_file_push("10.0.0.1", "/local.txt", "/remote.txt", connection_mode="gateway", gateway="demo"),
+                {"direction": "push"},
+            )
+        push.assert_called_once_with(
+            "10.0.0.1",
+            "/local.txt",
+            "/remote.txt",
+            timeout=300,
+            confirmed=False,
+            connection_mode="gateway",
+            gateway="demo",
+        )
+
+        with patch("ssh_assist_mcp.server.SSHTool.file_pull", return_value={"direction": "pull"}) as pull:
+            self.assertEqual(
+                ssh_file_pull("10.0.0.1", "/remote.txt", "/local.txt", connection_mode="gateway", gateway="demo"),
+                {"direction": "pull"},
+            )
+        pull.assert_called_once_with(
+            "10.0.0.1",
+            "/remote.txt",
+            "/local.txt",
+            timeout=300,
+            confirmed=False,
+            connection_mode="gateway",
+            gateway="demo",
+        )
 
 
 if __name__ == "__main__":

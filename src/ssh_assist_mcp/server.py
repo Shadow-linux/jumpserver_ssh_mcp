@@ -22,6 +22,14 @@ TOOL_DESCRIPTIONS = {
     ),
     "ssh.rsync_upload": "Upload a local file or directory to a remote host with rsync over direct SSH.",
     "ssh.rsync_download": "Download a remote file or directory with rsync over direct SSH.",
+    "ssh.file_push": (
+        "Push one local file to a remote host through direct SSH or a JumpServer gateway without requiring rsync. "
+        "Uses base64 chunks with SHA256 verification and is intended for files up to 50MB."
+    ),
+    "ssh.file_pull": (
+        "Pull one remote file to the local machine through direct SSH or a JumpServer gateway without requiring rsync. "
+        "Uses base64 with SHA256 verification and is intended for files up to 50MB."
+    ),
     "ssh.matcher_list": "List available JumpServer entry matcher plugins from built-ins and configured search paths.",
     "ssh.matcher_validate": "Validate a declarative JumpServer matcher plugin file or JSON definition.",
     "ssh.matcher_probe": "Probe a JumpServer gateway matcher until target shell is reached without executing a remote command.",
@@ -130,6 +138,46 @@ def ssh_rsync_download(
     ).to_dict()
 
 
+def ssh_file_push(
+    host: str,
+    local_path: str,
+    remote_path: str,
+    timeout: int = 300,
+    confirmed: bool = False,
+    connection_mode: str = "direct",
+    gateway: Optional[str] = None,
+) -> dict:
+    return _tool().file_push(
+        host,
+        local_path,
+        remote_path,
+        timeout=timeout,
+        confirmed=confirmed,
+        connection_mode=connection_mode,
+        gateway=gateway,
+    )
+
+
+def ssh_file_pull(
+    host: str,
+    remote_path: str,
+    local_path: str,
+    timeout: int = 300,
+    confirmed: bool = False,
+    connection_mode: str = "direct",
+    gateway: Optional[str] = None,
+) -> dict:
+    return _tool().file_pull(
+        host,
+        remote_path,
+        local_path,
+        timeout=timeout,
+        confirmed=confirmed,
+        connection_mode=connection_mode,
+        gateway=gateway,
+    )
+
+
 def ssh_matcher_list(profile_path: Optional[str] = None) -> dict:
     config = load_ssh_config(profile_path)
     registry = MatcherRegistry(search_paths=config.matcher_search_paths or [])
@@ -234,6 +282,8 @@ def register_tools(mcp) -> None:
     mcp.tool(name="ssh.run_script", description=TOOL_DESCRIPTIONS["ssh.run_script"])(ssh_run_script)
     mcp.tool(name="ssh.rsync_upload", description=TOOL_DESCRIPTIONS["ssh.rsync_upload"])(ssh_rsync_upload)
     mcp.tool(name="ssh.rsync_download", description=TOOL_DESCRIPTIONS["ssh.rsync_download"])(ssh_rsync_download)
+    mcp.tool(name="ssh.file_push", description=TOOL_DESCRIPTIONS["ssh.file_push"])(ssh_file_push)
+    mcp.tool(name="ssh.file_pull", description=TOOL_DESCRIPTIONS["ssh.file_pull"])(ssh_file_pull)
     mcp.tool(name="ssh.matcher_list", description=TOOL_DESCRIPTIONS["ssh.matcher_list"])(ssh_matcher_list)
     mcp.tool(name="ssh.matcher_validate", description=TOOL_DESCRIPTIONS["ssh.matcher_validate"])(ssh_matcher_validate)
     mcp.tool(name="ssh.matcher_probe", description=TOOL_DESCRIPTIONS["ssh.matcher_probe"])(ssh_matcher_probe)

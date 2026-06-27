@@ -1,11 +1,13 @@
-"""SSH command, script, and rsync execution helpers."""
+"""SSH command, script, rsync, and portable file transfer helpers."""
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import shlex
 import subprocess
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .audit import AuditLogger
@@ -15,6 +17,10 @@ from .gateway import GatewaySSHRunner
 from .matchers import MatcherRegistry
 from .result import CommandResult, SSHAuditEvent
 from .safety import SafetyPolicy
+
+DEFAULT_FILE_TRANSFER_MAX_BYTES = 50 * 1024 * 1024
+DEFAULT_FILE_TRANSFER_CHUNK_SIZE = 768 * 1024
+FILE_TRANSFER_HEREDOC = "__SSH_ASSIST_B64__"
 
 
 class SSHTool:
@@ -171,11 +177,206 @@ class SSHTool:
             {"connection_mode": connection_mode, "gateway": gateway, "remote_path": remote_path, "local_path": local_path},
         )
 
+    def file_push(
+        self,
+        host: str,
+        local_path: str,
+        remote_path: str,
+        timeout: int = 300,
+        confirmed: bool = False,
+        connection_mode: str = "direct",
+        gateway: Optional[str] = None,
+        max_bytes: int = DEFAULT_FILE_TRANSFER_MAX_BYTES,
+        chunk_size: int = DEFAULT_FILE_TRANSFER_CHUNK_SIZE,
+    ) -> Dict[str, Any]:
+        local = Path(local_path).expanduser()
+        if not local.is_file():
+            raise ToolExecutionError(f"local_path is not a file: {local_path}")
+        size = local.stat().st_size
+        if size > max_bytes:
+            raise ToolExecutionError(f"local file size {size} exceeds max_bytes {max_bytes}")
+        digest = _file_sha256(local)
+        assessment = self.safety_policy.assess_tool(
+            "ssh.file_push",
+            {
+                "connection_mode": connection_mode,
+                "gateway": gateway,
+                "local_path": str(local),
+                "remote_path": remote_path,
+                "bytes": size,
+                "sha256": digest,
+            },
+        )
+        audit_event = self._audit_event(
+            "ssh.file_push",
+            host,
+            False,
+            assessment,
+            {
+                "connection_mode": connection_mode,
+                "gateway": gateway,
+                "local_path": str(local),
+                "remote_path": remote_path,
+                "bytes": size,
+                "sha256": digest,
+                "max_bytes": max_bytes,
+                "chunk_size": chunk_size,
+                "timeout": timeout,
+            },
+        )
+        self._ensure_executable(assessment, confirmed, audit_event)
+        started = time.monotonic()
+        try:
+            tmp_b64 = f"{remote_path}.ssh-assist-{digest[:12]}.b64"
+            remote_dir = _remote_dirname(remote_path)
+            self._execute_remote_command(
+                host,
+                f"mkdir -p {shlex.quote(remote_dir)} && : > {shlex.quote(tmp_b64)}",
+                timeout,
+                connection_mode,
+                gateway,
+            )
+            effective_chunk_size = _base64_chunk_size(chunk_size)
+            with local.open("rb") as handle:
+                while True:
+                    chunk = handle.read(effective_chunk_size)
+                    if not chunk:
+                        break
+                    encoded = base64.b64encode(chunk).decode("ascii")
+                    append_command = (
+                        f"cat >> {shlex.quote(tmp_b64)} <<'{FILE_TRANSFER_HEREDOC}'\n"
+                        f"{encoded}\n"
+                        f"{FILE_TRANSFER_HEREDOC}"
+                    )
+                    self._execute_remote_command(host, append_command, timeout, connection_mode, gateway)
+            finalize_command = (
+                f"base64 -d {shlex.quote(tmp_b64)} > {shlex.quote(remote_path)} && "
+                f"rm -f {shlex.quote(tmp_b64)} && "
+                f"sha256sum {shlex.quote(remote_path)} | awk '{{print $1}}'"
+            )
+            remote_digest = _first_output_token(
+                self._execute_remote_command(host, finalize_command, timeout, connection_mode, gateway).stdout
+            )
+            if remote_digest != digest:
+                raise ToolExecutionError(f"remote sha256 mismatch: expected {digest}, got {remote_digest}")
+            self._record_audit(audit_event, "success", time.monotonic() - started, returncode=0)
+            return {
+                "direction": "push",
+                "host": host,
+                "connection_mode": connection_mode,
+                "gateway": gateway,
+                "local_path": str(local),
+                "remote_path": remote_path,
+                "bytes": size,
+                "sha256": digest,
+                "verified": True,
+            }
+        except Exception as exc:
+            self._record_audit(audit_event, "error", time.monotonic() - started, error=str(exc))
+            if isinstance(exc, ToolExecutionError):
+                raise
+            raise ToolExecutionError(str(exc)) from exc
+
+    def file_pull(
+        self,
+        host: str,
+        remote_path: str,
+        local_path: str,
+        timeout: int = 300,
+        confirmed: bool = False,
+        connection_mode: str = "direct",
+        gateway: Optional[str] = None,
+        max_bytes: int = DEFAULT_FILE_TRANSFER_MAX_BYTES,
+    ) -> Dict[str, Any]:
+        assessment = self.safety_policy.assess_tool(
+            "ssh.file_pull",
+            {"connection_mode": connection_mode, "gateway": gateway, "remote_path": remote_path, "local_path": local_path},
+        )
+        audit_event = self._audit_event(
+            "ssh.file_pull",
+            host,
+            False,
+            assessment,
+            {
+                "connection_mode": connection_mode,
+                "gateway": gateway,
+                "remote_path": remote_path,
+                "local_path": str(Path(local_path).expanduser()),
+                "max_bytes": max_bytes,
+                "timeout": timeout,
+            },
+        )
+        self._ensure_executable(assessment, confirmed, audit_event)
+        started = time.monotonic()
+        try:
+            size_output = self._execute_remote_command(
+                host, f"wc -c < {shlex.quote(remote_path)}", timeout, connection_mode, gateway
+            ).stdout.strip()
+            size = int(size_output.splitlines()[-1].strip())
+            if size > max_bytes:
+                raise ToolExecutionError(f"remote file size {size} exceeds max_bytes {max_bytes}")
+            remote_digest = _first_output_token(
+                self._execute_remote_command(
+                    host,
+                    f"sha256sum {shlex.quote(remote_path)} | awk '{{print $1}}'",
+                    timeout,
+                    connection_mode,
+                    gateway,
+                ).stdout
+            )
+            encoded = self._execute_remote_command(
+                host, f"base64 < {shlex.quote(remote_path)}", timeout, connection_mode, gateway
+            ).stdout
+            data = base64.b64decode("".join(encoded.split()), validate=False)
+            digest = hashlib.sha256(data).hexdigest()
+            if digest != remote_digest:
+                raise ToolExecutionError(f"local sha256 mismatch: expected {remote_digest}, got {digest}")
+            local = Path(local_path).expanduser()
+            local.parent.mkdir(parents=True, exist_ok=True)
+            tmp_local = local.with_name(f"{local.name}.ssh-assist-tmp")
+            tmp_local.write_bytes(data)
+            tmp_local.replace(local)
+            audit_event.params.update({"bytes": size, "sha256": digest})
+            self._record_audit(audit_event, "success", time.monotonic() - started, returncode=0)
+            return {
+                "direction": "pull",
+                "host": host,
+                "connection_mode": connection_mode,
+                "gateway": gateway,
+                "remote_path": remote_path,
+                "local_path": str(local),
+                "bytes": size,
+                "sha256": digest,
+                "verified": True,
+            }
+        except Exception as exc:
+            self._record_audit(audit_event, "error", time.monotonic() - started, error=str(exc))
+            if isinstance(exc, ToolExecutionError):
+                raise
+            raise ToolExecutionError(str(exc)) from exc
+
     def _rsync(self, tool: str, argv: List[str], host: str, timeout: int, confirmed: bool, params: Dict[str, Any]):
         assessment = self.safety_policy.assess_tool(tool, params)
         audit_event = self._audit_event(tool, host, False, assessment, {**params, "timeout": timeout})
         self._ensure_executable(assessment, confirmed, audit_event)
         return self._run(argv, timeout, audit_event)
+
+    def _execute_remote_command(
+        self,
+        host: str,
+        command: str,
+        timeout: int,
+        connection_mode: str,
+        gateway: Optional[str],
+    ) -> CommandResult:
+        if connection_mode == "gateway":
+            gateway_config = self._gateway_config(gateway)
+            return GatewaySSHRunner(gateway_config, matcher_registry=self._matcher_registry()).run_command(
+                host, command, timeout, None, self._record_audit
+            )
+        if connection_mode != "direct":
+            raise ToolExecutionError(f"Unsupported connection_mode: {connection_mode}")
+        return self._run(["ssh", *self._ssh_options(), self._target(host), command], timeout, None)
 
     def _run(
         self,
@@ -286,6 +487,32 @@ class SSHTool:
 
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _base64_chunk_size(chunk_size: int) -> int:
+    if chunk_size < 3:
+        return 3
+    return chunk_size - (chunk_size % 3)
+
+
+def _first_output_token(value: str) -> str:
+    parts = value.strip().split()
+    return parts[0] if parts else ""
+
+
+def _remote_dirname(path: str) -> str:
+    if "/" not in path.strip("/"):
+        return "."
+    parent = path.rsplit("/", 1)[0]
+    return parent or "/"
 
 
 def _preview(value: str, limit: int = 160) -> str:

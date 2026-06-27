@@ -17,6 +17,8 @@
 - `ssh.run_script`
 - `ssh.rsync_upload`
 - `ssh.rsync_download`
+- `ssh.file_push`
+- `ssh.file_pull`
 - 基础安全策略和审计日志
 - 基础 JumpServer 交互式 gateway 执行
 
@@ -179,7 +181,7 @@ Matcher 只负责 JumpServer 登录入口匹配，不能执行目标机器命令
 - 报告已经到达 shell
 - 报告未匹配，并返回脱敏 transcript 片段给 Agent 修插件
 
-远程命令仍由 `ssh.run_command` / `ssh.run_script` 统一执行。
+远程命令仍由 `ssh.run_command` / `ssh.run_script` 统一执行。文件传输优先使用 `ssh.file_push` / `ssh.file_pull`；`ssh.rsync_upload` / `ssh.rsync_download` 只适合 direct SSH + rsync 场景。
 
 ## MCP Tools
 
@@ -189,6 +191,14 @@ Matcher 只负责 JumpServer 登录入口匹配，不能执行目标机器命令
 - `ssh.run_script`
 - `ssh.rsync_upload`
 - `ssh.rsync_download`
+- `ssh.file_push`
+- `ssh.file_pull`
+
+文件传输：
+
+- `ssh.file_push`：单文件上传，支持 direct SSH 和 JumpServer gateway，不依赖远端 rsync，默认上限 50MB。
+- `ssh.file_pull`：单文件下载，支持 direct SSH 和 JumpServer gateway，不依赖远端 rsync，默认上限 50MB。
+- `ssh.rsync_upload` / `ssh.rsync_download`：保留给 direct SSH 的大文件或目录同步；交互式 JumpServer gateway 不支持 rsync 协议流。
 
 Matcher tools：
 

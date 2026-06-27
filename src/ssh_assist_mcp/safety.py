@@ -91,6 +91,22 @@ class SafetyPolicy:
                 True,
                 ["host", "remote_path", "local_path"],
             )
+        if tool == "ssh.file_push":
+            return ToolRiskAssessment(
+                tool,
+                "medium",
+                "Remote file push writes content to the target filesystem.",
+                True,
+                ["host", "local_path", "remote_path", "impact", "rollback"],
+            )
+        if tool == "ssh.file_pull":
+            return ToolRiskAssessment(
+                tool,
+                "medium",
+                "Remote file pull may copy sensitive data and should stay auditable.",
+                True,
+                ["host", "remote_path", "local_path", "data handling"],
+            )
         return ToolRiskAssessment(tool, "read", "Read-only operation.")
 
     def ensure_tool_executable(self, assessment: ToolRiskAssessment, confirmed: bool) -> None:

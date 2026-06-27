@@ -27,6 +27,18 @@ matchers:
 5. On success, use `ssh.run_command` with `connection_mode: gateway`, explicit `gateway`, and a read-only command.
 6. On failure, inspect the returned state, reason, and transcript excerpt.
 
+## File Transfer
+
+Use `ssh.file_push` and `ssh.file_pull` for single-file transfer through JumpServer gateways. They use base64 chunks and SHA256 verification, and do not require remote `rsync`.
+
+Limits and routing:
+
+- Use for files up to 50MB.
+- Always pass explicit `connection_mode: gateway` and `gateway`.
+- `ssh.file_push` writes to the remote filesystem and requires human confirmation.
+- `ssh.file_pull` may copy sensitive remote data and requires human confirmation.
+- Do not use `ssh.rsync_upload` or `ssh.rsync_download` with interactive JumpServer gateways; those tools are for direct SSH rsync only.
+
 ## Matcher Repair Sequence
 
 1. Read `jumpserver-ssh-mcp://docs/matchers/guide`.

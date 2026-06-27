@@ -45,6 +45,16 @@ def build_parser() -> argparse.ArgumentParser:
     download.add_argument("--remote", required=True)
     download.add_argument("--local", required=True)
     download.add_argument("--confirm-risk", action="store_true")
+
+    push = subparsers.add_parser("push", parents=[parent], help="Push one file without requiring rsync.")
+    push.add_argument("--local", required=True)
+    push.add_argument("--remote", required=True)
+    push.add_argument("--confirm-risk", action="store_true")
+
+    pull = subparsers.add_parser("pull", parents=[parent], help="Pull one file without requiring rsync.")
+    pull.add_argument("--remote", required=True)
+    pull.add_argument("--local", required=True)
+    pull.add_argument("--confirm-risk", action="store_true")
     return parser
 
 
@@ -96,10 +106,31 @@ def main(argv: list[str] | None = None) -> int:
                 connection_mode=args.connection_mode,
                 gateway=args.gateway,
             )
+        elif args.command == "push":
+            result = tool.file_push(
+                args.host,
+                args.local,
+                args.remote,
+                timeout=args.timeout,
+                confirmed=args.confirm_risk,
+                connection_mode=args.connection_mode,
+                gateway=args.gateway,
+            )
+        elif args.command == "pull":
+            result = tool.file_pull(
+                args.host,
+                args.remote,
+                args.local,
+                timeout=args.timeout,
+                confirmed=args.confirm_risk,
+                connection_mode=args.connection_mode,
+                gateway=args.gateway,
+            )
         else:
             parser.error(f"Unknown command: {args.command}")
-        print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
-        return result.returncode
+        payload = result.to_dict() if hasattr(result, "to_dict") else result
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return result.returncode if hasattr(result, "returncode") else 0
     except (SafetyError, ToolExecutionError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2), file=sys.stderr)
         return 2

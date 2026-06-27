@@ -52,18 +52,23 @@ class GatewaySSHRunner:
         attempts = max(1, int(self.config.max_attempts))
         for attempt in range(1, attempts + 1):
             try:
-                stdout, returncode = self._run_once(host, wrapped, command, sentinel, timeout, audit_event.sudo)
+                sudo = audit_event.sudo if audit_event is not None else False
+                stdout, returncode = self._run_once(host, wrapped, command, sentinel, timeout, sudo)
                 result = CommandResult(
                     [self.config.command, "<gateway>", host, "<remote-command>"], returncode, stdout, ""
                 )
-                audit_recorder(audit_event, "success" if returncode == 0 else "failed", time.monotonic() - started, returncode)
+                if audit_event is not None:
+                    audit_recorder(
+                        audit_event, "success" if returncode == 0 else "failed", time.monotonic() - started, returncode
+                    )
                 return result
             except Exception as exc:
                 last_error = exc
                 if attempt >= attempts:
                     break
                 time.sleep(float(self.config.retry_delay_seconds))
-        audit_recorder(audit_event, "error", time.monotonic() - started, error=str(last_error))
+        if audit_event is not None:
+            audit_recorder(audit_event, "error", time.monotonic() - started, error=str(last_error))
         raise ToolExecutionError(str(last_error)) from last_error
 
     def _run_once(
