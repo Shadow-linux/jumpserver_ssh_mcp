@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from .config import DEFAULT_COMMAND_TIMEOUT
 from .errors import SafetyError, ToolExecutionError
 from .ssh import SSHTool, load_ssh_config
 
@@ -18,9 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     parent = argparse.ArgumentParser(add_help=False)
     parent.add_argument("host")
-    parent.add_argument("--timeout", type=int, default=30)
+    parent.add_argument("--timeout", type=int, default=DEFAULT_COMMAND_TIMEOUT)
     parent.add_argument("--connection-mode", choices=["direct", "gateway"], default="direct")
     parent.add_argument("--gateway")
+    parent.add_argument("--owner-id", help="Owner/session id used to clean only this owner's stale gateway SSH sessions.")
 
     run = subparsers.add_parser("run", parents=[parent], help="Run one remote command.")
     run.add_argument("--command", required=True, dest="remote_command")
@@ -73,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
                 confirmed=args.confirm_risk,
                 connection_mode=args.connection_mode,
                 gateway=args.gateway,
+                owner_id=args.owner_id,
             )
         elif args.command == "script":
             result = tool.run_script(
@@ -85,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
                 confirmed=args.confirm_risk,
                 connection_mode=args.connection_mode,
                 gateway=args.gateway,
+                owner_id=args.owner_id,
             )
         elif args.command == "upload":
             result = tool.rsync_upload(
@@ -95,6 +99,7 @@ def main(argv: list[str] | None = None) -> int:
                 confirmed=args.confirm_risk,
                 connection_mode=args.connection_mode,
                 gateway=args.gateway,
+                owner_id=args.owner_id,
             )
         elif args.command == "download":
             result = tool.rsync_download(
@@ -105,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
                 confirmed=args.confirm_risk,
                 connection_mode=args.connection_mode,
                 gateway=args.gateway,
+                owner_id=args.owner_id,
             )
         elif args.command == "push":
             result = tool.file_push(
@@ -115,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
                 confirmed=args.confirm_risk,
                 connection_mode=args.connection_mode,
                 gateway=args.gateway,
+                owner_id=args.owner_id,
             )
         elif args.command == "pull":
             result = tool.file_pull(
@@ -125,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
                 confirmed=args.confirm_risk,
                 connection_mode=args.connection_mode,
                 gateway=args.gateway,
+                owner_id=args.owner_id,
             )
         else:
             parser.error(f"Unknown command: {args.command}")

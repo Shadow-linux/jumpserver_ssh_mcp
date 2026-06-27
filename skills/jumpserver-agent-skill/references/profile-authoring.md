@@ -16,7 +16,7 @@ gateways:
     command: ssh -i ~/.ssh/pro.pem ops@jump.example.com -p2222
     matcher: builtin-generic
     preferred_account: __su
-    command_timeout: 60
+    command_timeout: 1800
 
 matchers:
   custom_dirs:
@@ -31,7 +31,7 @@ Optional per gateway:
 
 - `matcher`; defaults to `builtin-generic`
 - `preferred_account`; useful when JumpServer shows multiple asset accounts
-- `command_timeout`; use `60` for onboarding smoke, larger for long commands
+- `command_timeout`; defaults to `1800` seconds for command execution
 
 Optional top-level:
 

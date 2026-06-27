@@ -18,7 +18,7 @@ class FakeRemoteSSHTool(SSHTool):
         self.remote_root = remote_root
         self.commands = []
 
-    def _execute_remote_command(self, host, command, timeout, connection_mode, gateway):
+    def _execute_remote_command(self, host, command, timeout, connection_mode, gateway, owner_id=None):
         self.commands.append(command)
         if "wc -c <" in command:
             path = self._remote_path(command.split("<", 1)[1].strip())

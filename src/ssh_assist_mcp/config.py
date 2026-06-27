@@ -10,6 +10,8 @@ from typing import Dict, List, Optional
 from .errors import ToolExecutionError
 from .paths import default_profile_candidates
 
+DEFAULT_COMMAND_TIMEOUT = 1800
+
 
 @dataclass
 class MatcherConfig:
@@ -39,7 +41,7 @@ class GatewayConfig:
     login_prompt_patterns: List[str] = None
     login_password_env: Optional[str] = None
     connect_timeout: int = 30
-    command_timeout: int = 300
+    command_timeout: int = DEFAULT_COMMAND_TIMEOUT
     max_attempts: int = 2
     retry_delay_seconds: float = 0.5
     privilege_escalation: Optional[PrivilegeEscalationConfig] = None
@@ -122,7 +124,7 @@ def _gateway_configs(raw_gateways: object) -> Dict[str, GatewayConfig]:
             preferred_account=raw.get("preferred_account"),
             account_id_by_host={str(k): str(v) for k, v in (raw.get("account_id_by_host", {}) or {}).items()},
             connect_timeout=int(raw.get("connect_timeout", 30)),
-            command_timeout=int(raw.get("command_timeout", 300)),
+            command_timeout=int(raw.get("command_timeout", DEFAULT_COMMAND_TIMEOUT)),
             max_attempts=int(raw.get("max_attempts", 2)),
             retry_delay_seconds=float(raw.get("retry_delay_seconds", 0.5)),
             privilege_escalation=_privilege_escalation_config(raw.get("privilege_escalation")),

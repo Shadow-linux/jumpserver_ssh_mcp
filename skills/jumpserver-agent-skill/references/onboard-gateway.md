@@ -27,6 +27,19 @@ matchers:
 5. On success, use `ssh.run_command` with `connection_mode: gateway`, explicit `gateway`, and a read-only command.
 6. On failure, inspect the returned state, reason, and transcript excerpt.
 
+## Owner Scoped Sessions
+
+When the MCP tool accepts `owner_id`, pass a stable value for the current Agent/thread, such as `codex-thread-<thread-id>` or another human-readable unique id.
+
+Rules:
+
+- Use the same `owner_id` for retries from the same Agent/thread.
+- Do not reuse another Agent's `owner_id`.
+- The MCP records gateway SSH child processes under `~/jumpserver-ssh-mcp/run/sessions/<owner_id>/`.
+- Before starting a new gateway SSH session, the MCP may clean child processes older than the 3-minute stale grace period recorded for the same `owner_id`.
+- This same-owner cleanup is intended for interrupted Agent calls; it must not be used as a global SSH cleanup mechanism.
+- If the human manually opened a JumpServer SSH terminal, do not claim or clean it unless the human explicitly asks.
+
 ## File Transfer
 
 Use `ssh.file_push` and `ssh.file_pull` for single-file transfer through JumpServer gateways. They use base64 chunks and SHA256 verification, and do not require remote `rsync`.
@@ -38,6 +51,21 @@ Limits and routing:
 - `ssh.file_push` writes to the remote filesystem and requires human confirmation.
 - `ssh.file_pull` may copy sensitive remote data and requires human confirmation.
 - Do not use `ssh.rsync_upload` or `ssh.rsync_download` with interactive JumpServer gateways; those tools are for direct SSH rsync only.
+
+## Long Downloads And Builds
+
+For package downloads, large file downloads, builds, and installs that may take minutes, prefer a background remote job plus short polling commands. Do not keep one foreground `ssh.run_command` call occupied when the task can safely continue on the remote host.
+
+Recommended pattern:
+
+1. Start the work with `nohup`, `systemd-run`, `tmux`, or another available background mechanism.
+2. Redirect stdout/stderr to a known log file under `/tmp` or the task working directory.
+3. Write a pid/status file when practical.
+4. Poll with short read-only commands such as `ps`, `tail -n 80 <log>`, `stat`, `ls -lh`, checksum checks, or `systemctl status --no-pager`.
+5. Stop polling when the expected file exists, the checksum matches, the process exits successfully, or the log reports completion.
+6. If the background task is destructive, privileged, or production-impacting, ask the human before starting it.
+
+Avoid re-running package installs or downloads blindly after a timeout. First check process state, lock files, logs, output files, and checksums.
 
 ## Matcher Repair Sequence
 

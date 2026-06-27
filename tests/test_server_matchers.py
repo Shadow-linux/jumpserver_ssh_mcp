@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from ssh_assist_mcp.config import DEFAULT_COMMAND_TIMEOUT
 from ssh_assist_mcp.server import (
     MATCHER_RESOURCE_URIS,
     register_resources,
@@ -102,10 +103,11 @@ class ServerMatcherToolsTest(unittest.TestCase):
             "10.0.0.1",
             "/local.txt",
             "/remote.txt",
-            timeout=300,
+            timeout=DEFAULT_COMMAND_TIMEOUT,
             confirmed=False,
             connection_mode="gateway",
             gateway="demo",
+            owner_id=None,
         )
 
         with patch("ssh_assist_mcp.server.SSHTool.file_pull", return_value={"direction": "pull"}) as pull:
@@ -117,10 +119,11 @@ class ServerMatcherToolsTest(unittest.TestCase):
             "10.0.0.1",
             "/remote.txt",
             "/local.txt",
-            timeout=300,
+            timeout=DEFAULT_COMMAND_TIMEOUT,
             confirmed=False,
             connection_mode="gateway",
             gateway="demo",
+            owner_id=None,
         )
 
 

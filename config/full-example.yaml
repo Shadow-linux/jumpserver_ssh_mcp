@@ -34,7 +34,7 @@ gateways:
 
     # Optional timeouts and retry behavior.
     connect_timeout: 30
-    command_timeout: 300
+    command_timeout: 1800
     max_attempts: 2
     retry_delay_seconds: 0.5
 
@@ -54,7 +54,7 @@ gateways:
     command: ssh -i ~/.ssh/jumpserver-prod.pem ops@jump-prod.example.com -p2222
     matcher: builtin-generic
     preferred_account: root
-    command_timeout: 300
+    command_timeout: 1800
 
 matchers:
   # Preferred key for new simple profiles.

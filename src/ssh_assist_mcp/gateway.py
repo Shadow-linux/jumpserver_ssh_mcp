@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import os
 import re
 import shlex
+import signal
 import time
-from typing import List, Optional, Tuple
+from contextlib import suppress
+from typing import List, Optional, Set, Tuple
 
 from .config import GatewayConfig
 from .errors import ToolExecutionError
 from .jumpserver_accounts import _select_account_id
 from .matchers import MatcherContext, MatcherRegistry
 from .result import CommandResult, SSHAuditEvent
+from .sessions import GatewaySessionRegistry
+
+_ACTIVE_CHILDREN: Set[object] = set()
+_SIGNAL_HANDLERS_INSTALLED = False
 
 
 class GatewaySSHRunner:
@@ -28,7 +35,7 @@ class GatewaySSHRunner:
             self._login(child)
             steps = self._drive_matcher_login(child, host, collect_trace=True)
             child.send("exit\r")
-            child.close(force=True)
+            _close_child(child)
             return {
                 "gateway": self.config.name,
                 "host": host,
@@ -38,22 +45,37 @@ class GatewaySSHRunner:
             }
         except Exception as exc:
             if child is not None:
-                try:
-                    child.close(force=True)
-                except Exception:
-                    pass
+                _close_child(child)
             raise ToolExecutionError(str(exc)) from exc
 
-    def run_command(self, host: str, command: str, timeout: int, audit_event: SSHAuditEvent, audit_recorder) -> CommandResult:
+    def run_command(
+        self,
+        host: str,
+        command: str,
+        timeout: int,
+        audit_event: SSHAuditEvent,
+        audit_recorder,
+        owner_id: Optional[str] = None,
+    ) -> CommandResult:
         started = time.monotonic()
         sentinel = f"__SSH_ASSIST_DONE_{_sha256(host + command)[:12]}__"
+        command_sha256 = _sha256(command)
         wrapped = self._wrap_command(command, sentinel)
         last_error: Optional[Exception] = None
         attempts = max(1, int(self.config.max_attempts))
         for attempt in range(1, attempts + 1):
             try:
                 sudo = audit_event.sudo if audit_event is not None else False
-                stdout, returncode = self._run_once(host, wrapped, command, sentinel, timeout, sudo)
+                stdout, returncode = self._run_once(
+                    host,
+                    wrapped,
+                    command,
+                    sentinel,
+                    timeout,
+                    sudo,
+                    owner_id=owner_id,
+                    command_sha256=command_sha256,
+                )
                 result = CommandResult(
                     [self.config.command, "<gateway>", host, "<remote-command>"], returncode, stdout, ""
                 )
@@ -64,6 +86,22 @@ class GatewaySSHRunner:
                 return result
             except Exception as exc:
                 last_error = exc
+                if _is_timeout_error(exc):
+                    result = CommandResult(
+                        [self.config.command, "<gateway>", host, "<remote-command>"],
+                        124,
+                        "",
+                        f"command timed out after {timeout} seconds",
+                    )
+                    if audit_event is not None:
+                        audit_recorder(
+                            audit_event,
+                            "timeout",
+                            time.monotonic() - started,
+                            returncode=124,
+                            error=result.stderr,
+                        )
+                    return result
                 if attempt >= attempts:
                     break
                 time.sleep(float(self.config.retry_delay_seconds))
@@ -72,11 +110,21 @@ class GatewaySSHRunner:
         raise ToolExecutionError(str(last_error)) from last_error
 
     def _run_once(
-        self, host: str, wrapped: str, original_command: str, sentinel: str, timeout: int, sudo: bool = False
+        self,
+        host: str,
+        wrapped: str,
+        original_command: str,
+        sentinel: str,
+        timeout: int,
+        sudo: bool = False,
+        owner_id: Optional[str] = None,
+        command_sha256: Optional[str] = None,
     ) -> Tuple[str, int]:
         child = None
         try:
-            child = self._spawn(timeout)
+            import pexpect
+
+            child = self._spawn(timeout, owner_id=owner_id, host=host, command_sha256=command_sha256)
             self._login(child)
             self._drive_matcher_login(child, host)
             if sudo and self.config.privilege_escalation:
@@ -88,17 +136,24 @@ class GatewaySSHRunner:
             child.send("exit\r")
             if sudo and self.config.privilege_escalation:
                 child.send("exit\r")
-            child.close(force=True)
+            _close_child(child)
             return _clean_gateway_output(stdout, original_command, sentinel), returncode
+        except pexpect.TIMEOUT as exc:
+            if child is not None:
+                _close_child(child)
+            raise ToolExecutionError(f"command timed out after {timeout} seconds") from exc
         except Exception as exc:
             if child is not None:
-                try:
-                    child.close(force=True)
-                except Exception:
-                    pass
+                _close_child(child)
             raise ToolExecutionError(str(exc)) from exc
 
-    def _spawn(self, timeout: int):
+    def _spawn(
+        self,
+        timeout: int,
+        owner_id: Optional[str] = None,
+        host: Optional[str] = None,
+        command_sha256: Optional[str] = None,
+    ):
         try:
             import pexpect
         except ImportError as exc:
@@ -106,7 +161,19 @@ class GatewaySSHRunner:
         argv = shlex.split(self.config.command)
         if not argv:
             raise ToolExecutionError(f"Gateway {self.config.name} command is empty.")
-        return pexpect.spawn(argv[0], argv[1:], encoding="utf-8", timeout=timeout, echo=False)
+        if owner_id:
+            GatewaySessionRegistry().cleanup_owner(owner_id)
+        child = pexpect.spawn(argv[0], argv[1:], encoding="utf-8", timeout=timeout, echo=False)
+        session_path = GatewaySessionRegistry().write(
+            owner_id=owner_id,
+            child_pid=getattr(child, "pid", None),
+            mcp_pid=os.getpid(),
+            gateway=self.config.name,
+            target=host or "",
+            command_sha256=command_sha256 or "",
+        )
+        _register_child(child, owner_id=owner_id, session_path=session_path)
+        return child
 
     def _login(self, child) -> None:
         login_patterns = self.config.login_prompt_patterns or []
@@ -216,8 +283,55 @@ def _matches_any(patterns: List[str], text: str) -> bool:
     return any(re.search(pattern, text) for pattern in patterns)
 
 
+def _register_child(child: object, owner_id: Optional[str] = None, session_path: Optional[object] = None) -> None:
+    global _SIGNAL_HANDLERS_INSTALLED
+    setattr(child, "_ssh_assist_owner_id", owner_id)
+    setattr(child, "_ssh_assist_session_path", session_path)
+    _ACTIVE_CHILDREN.add(child)
+    if not _SIGNAL_HANDLERS_INSTALLED:
+        atexit.register(_close_active_children)
+        _install_signal_cleanup()
+        _SIGNAL_HANDLERS_INSTALLED = True
+
+
+def _close_child(child: object) -> None:
+    with suppress(Exception):
+        child.close(force=True)
+    session_path = getattr(child, "_ssh_assist_session_path", None)
+    if session_path is not None:
+        with suppress(FileNotFoundError):
+            session_path.unlink()
+    _ACTIVE_CHILDREN.discard(child)
+
+
+def _close_active_children() -> None:
+    for child in list(_ACTIVE_CHILDREN):
+        _close_child(child)
+
+
+def _install_signal_cleanup() -> None:
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        previous_handler = signal.getsignal(sig)
+
+        def handler(signum, frame, previous_handler=previous_handler):
+            _close_active_children()
+            if callable(previous_handler):
+                previous_handler(signum, frame)
+                return
+            if previous_handler == signal.SIG_IGN:
+                return
+            raise SystemExit(128 + signum)
+
+        with suppress(ValueError):
+            signal.signal(sig, handler)
+
+
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _is_timeout_error(exc: Exception) -> bool:
+    return "timed out" in str(exc).lower() or "timeout" in exc.__class__.__name__.lower()
 
 
 def _gateway_input(value: str) -> str:

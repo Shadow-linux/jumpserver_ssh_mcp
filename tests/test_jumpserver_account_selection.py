@@ -7,6 +7,7 @@ from ssh_assist_mcp.jumpserver_accounts import (
     _select_account_id,
 )
 from ssh_assist_mcp.gateway import _clean_gateway_output
+from ssh_assist_mcp.gateway import _ACTIVE_CHILDREN, _close_active_children, _close_child
 from ssh_assist_mcp.matchers import MatcherRegistry
 
 
@@ -222,6 +223,26 @@ __SSH_ASSIST_DONE_demo__:END:0
 
         self.assertEqual(cleaned, "ok\nWed Jun 24 08:58:40 PM CST 2026\n")
 
+    def test_close_child_force_closes_and_unregisters_gateway_process(self):
+        child = ClosableChild()
+        _ACTIVE_CHILDREN.add(child)
+
+        _close_child(child)
+
+        self.assertEqual(child.closed_with, [True])
+        self.assertNotIn(child, _ACTIVE_CHILDREN)
+
+    def test_close_active_children_force_closes_registered_gateway_processes(self):
+        first = ClosableChild()
+        second = ClosableChild()
+        _ACTIVE_CHILDREN.update({first, second})
+
+        _close_active_children()
+
+        self.assertEqual(first.closed_with, [True])
+        self.assertEqual(second.closed_with, [True])
+        self.assertFalse(_ACTIVE_CHILDREN)
+
 
 class FakeChild:
     def __init__(self, matches, befores, afters=None):
@@ -241,6 +262,14 @@ class FakeChild:
 
     def send(self, value):
         self.sent.append(value)
+
+
+class ClosableChild:
+    def __init__(self):
+        self.closed_with = []
+
+    def close(self, force=False):
+        self.closed_with.append(force)
 
 
 if __name__ == "__main__":

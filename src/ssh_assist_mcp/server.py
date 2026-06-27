@@ -7,7 +7,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Optional
 
-from .config import load_ssh_config
+from .config import DEFAULT_COMMAND_TIMEOUT, load_ssh_config
 from .matchers import MatcherContext, MatcherRegistry, MatcherResult, validate_declarative_matcher
 from .ssh import SSHTool
 
@@ -55,12 +55,13 @@ def _tool() -> SSHTool:
 def ssh_run_command(
     host: str,
     command: str,
-    timeout: int = 30,
+    timeout: int = DEFAULT_COMMAND_TIMEOUT,
     cwd: Optional[str] = None,
     sudo: bool = False,
     confirmed: bool = False,
     connection_mode: str = "direct",
     gateway: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> dict:
     return _tool().run_command(
         host,
@@ -71,6 +72,7 @@ def ssh_run_command(
         confirmed=confirmed,
         connection_mode=connection_mode,
         gateway=gateway,
+        owner_id=owner_id,
     ).to_dict()
 
 
@@ -79,11 +81,12 @@ def ssh_run_script(
     script_type: str,
     content: str,
     args: Optional[list] = None,
-    timeout: int = 300,
+    timeout: int = DEFAULT_COMMAND_TIMEOUT,
     sudo: bool = False,
     confirmed: bool = False,
     connection_mode: str = "direct",
     gateway: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> dict:
     return _tool().run_script(
         host,
@@ -95,6 +98,7 @@ def ssh_run_script(
         confirmed=confirmed,
         connection_mode=connection_mode,
         gateway=gateway,
+        owner_id=owner_id,
     ).to_dict()
 
 
@@ -102,10 +106,11 @@ def ssh_rsync_upload(
     host: str,
     local_path: str,
     remote_path: str,
-    timeout: int = 300,
+    timeout: int = DEFAULT_COMMAND_TIMEOUT,
     confirmed: bool = False,
     connection_mode: str = "direct",
     gateway: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> dict:
     return _tool().rsync_upload(
         host,
@@ -115,6 +120,7 @@ def ssh_rsync_upload(
         confirmed=confirmed,
         connection_mode=connection_mode,
         gateway=gateway,
+        owner_id=owner_id,
     ).to_dict()
 
 
@@ -122,10 +128,11 @@ def ssh_rsync_download(
     host: str,
     remote_path: str,
     local_path: str,
-    timeout: int = 300,
+    timeout: int = DEFAULT_COMMAND_TIMEOUT,
     confirmed: bool = False,
     connection_mode: str = "direct",
     gateway: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> dict:
     return _tool().rsync_download(
         host,
@@ -135,6 +142,7 @@ def ssh_rsync_download(
         confirmed=confirmed,
         connection_mode=connection_mode,
         gateway=gateway,
+        owner_id=owner_id,
     ).to_dict()
 
 
@@ -142,10 +150,11 @@ def ssh_file_push(
     host: str,
     local_path: str,
     remote_path: str,
-    timeout: int = 300,
+    timeout: int = DEFAULT_COMMAND_TIMEOUT,
     confirmed: bool = False,
     connection_mode: str = "direct",
     gateway: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> dict:
     return _tool().file_push(
         host,
@@ -155,6 +164,7 @@ def ssh_file_push(
         confirmed=confirmed,
         connection_mode=connection_mode,
         gateway=gateway,
+        owner_id=owner_id,
     )
 
 
@@ -162,10 +172,11 @@ def ssh_file_pull(
     host: str,
     remote_path: str,
     local_path: str,
-    timeout: int = 300,
+    timeout: int = DEFAULT_COMMAND_TIMEOUT,
     confirmed: bool = False,
     connection_mode: str = "direct",
     gateway: Optional[str] = None,
+    owner_id: Optional[str] = None,
 ) -> dict:
     return _tool().file_pull(
         host,
@@ -175,6 +186,7 @@ def ssh_file_pull(
         confirmed=confirmed,
         connection_mode=connection_mode,
         gateway=gateway,
+        owner_id=owner_id,
     )
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .audit import AuditLogger
-from .config import GatewayConfig, SSHConfig, load_ssh_config
+from .config import DEFAULT_COMMAND_TIMEOUT, GatewayConfig, SSHConfig, load_ssh_config
 from .errors import SafetyError, ToolExecutionError
 from .gateway import GatewaySSHRunner
 from .matchers import MatcherRegistry
@@ -38,12 +38,13 @@ class SSHTool:
         self,
         host: str,
         command: str,
-        timeout: int = 30,
+        timeout: int = DEFAULT_COMMAND_TIMEOUT,
         cwd: Optional[str] = None,
         sudo: bool = False,
         confirmed: bool = False,
         connection_mode: str = "direct",
         gateway: Optional[str] = None,
+        owner_id: Optional[str] = None,
     ) -> CommandResult:
         privilege_escalation = self._privilege_escalation_method(connection_mode, gateway, sudo)
         remote_command = self._remote_command(command, cwd=cwd, sudo=sudo and privilege_escalation != "sudo_su")
@@ -62,6 +63,7 @@ class SSHTool:
                 "connection_mode": connection_mode,
                 "cwd": cwd,
                 "gateway": gateway,
+                "owner_id": owner_id,
                 "privilege_escalation": privilege_escalation,
                 "timeout": timeout,
             },
@@ -70,7 +72,7 @@ class SSHTool:
         if connection_mode == "gateway":
             gateway_config = self._gateway_config(gateway)
             return GatewaySSHRunner(gateway_config, matcher_registry=self._matcher_registry()).run_command(
-                host, remote_command, timeout, audit_event, self._record_audit
+                host, remote_command, timeout, audit_event, self._record_audit, owner_id=owner_id
             )
         return self._run(["ssh", *self._ssh_options(), self._target(host), remote_command], timeout, audit_event)
 
@@ -84,11 +86,12 @@ class SSHTool:
         script_type: str,
         content: str,
         args: Optional[List[str]] = None,
-        timeout: int = 300,
+        timeout: int = DEFAULT_COMMAND_TIMEOUT,
         sudo: bool = False,
         confirmed: bool = False,
         connection_mode: str = "direct",
         gateway: Optional[str] = None,
+        owner_id: Optional[str] = None,
     ) -> CommandResult:
         interpreter = "python3" if script_type == "python" else "bash"
         remote = f"{interpreter} -s"
@@ -120,6 +123,7 @@ class SSHTool:
                 "content_bytes": len(content.encode("utf-8")),
                 "args_count": len(args or []),
                 "gateway": gateway,
+                "owner_id": owner_id,
                 "privilege_escalation": privilege_escalation,
                 "timeout": timeout,
             },
@@ -131,7 +135,7 @@ class SSHTool:
                 script_type, content, args or [], sudo=sudo and privilege_escalation != "sudo_su"
             )
             return GatewaySSHRunner(gateway_config, matcher_registry=self._matcher_registry()).run_command(
-                host, gateway_command, timeout, audit_event, self._record_audit
+                host, gateway_command, timeout, audit_event, self._record_audit, owner_id=owner_id
             )
         return self._run(argv, timeout, audit_event, input_text=content)
 
@@ -140,10 +144,11 @@ class SSHTool:
         host: str,
         local_path: str,
         remote_path: str,
-        timeout: int = 300,
+        timeout: int = DEFAULT_COMMAND_TIMEOUT,
         confirmed: bool = False,
         connection_mode: str = "direct",
         gateway: Optional[str] = None,
+        owner_id: Optional[str] = None,
     ) -> CommandResult:
         if connection_mode == "gateway":
             raise ToolExecutionError("rsync over interactive gateway is not supported.")
@@ -153,7 +158,13 @@ class SSHTool:
             host,
             timeout,
             confirmed,
-            {"connection_mode": connection_mode, "gateway": gateway, "local_path": local_path, "remote_path": remote_path},
+            {
+                "connection_mode": connection_mode,
+                "gateway": gateway,
+                "owner_id": owner_id,
+                "local_path": local_path,
+                "remote_path": remote_path,
+            },
         )
 
     def rsync_download(
@@ -161,10 +172,11 @@ class SSHTool:
         host: str,
         remote_path: str,
         local_path: str,
-        timeout: int = 300,
+        timeout: int = DEFAULT_COMMAND_TIMEOUT,
         confirmed: bool = False,
         connection_mode: str = "direct",
         gateway: Optional[str] = None,
+        owner_id: Optional[str] = None,
     ) -> CommandResult:
         if connection_mode == "gateway":
             raise ToolExecutionError("rsync over interactive gateway is not supported.")
@@ -174,7 +186,13 @@ class SSHTool:
             host,
             timeout,
             confirmed,
-            {"connection_mode": connection_mode, "gateway": gateway, "remote_path": remote_path, "local_path": local_path},
+            {
+                "connection_mode": connection_mode,
+                "gateway": gateway,
+                "owner_id": owner_id,
+                "remote_path": remote_path,
+                "local_path": local_path,
+            },
         )
 
     def file_push(
@@ -182,10 +200,11 @@ class SSHTool:
         host: str,
         local_path: str,
         remote_path: str,
-        timeout: int = 300,
+        timeout: int = DEFAULT_COMMAND_TIMEOUT,
         confirmed: bool = False,
         connection_mode: str = "direct",
         gateway: Optional[str] = None,
+        owner_id: Optional[str] = None,
         max_bytes: int = DEFAULT_FILE_TRANSFER_MAX_BYTES,
         chunk_size: int = DEFAULT_FILE_TRANSFER_CHUNK_SIZE,
     ) -> Dict[str, Any]:
@@ -201,6 +220,7 @@ class SSHTool:
             {
                 "connection_mode": connection_mode,
                 "gateway": gateway,
+                "owner_id": owner_id,
                 "local_path": str(local),
                 "remote_path": remote_path,
                 "bytes": size,
@@ -215,6 +235,7 @@ class SSHTool:
             {
                 "connection_mode": connection_mode,
                 "gateway": gateway,
+                "owner_id": owner_id,
                 "local_path": str(local),
                 "remote_path": remote_path,
                 "bytes": size,
@@ -235,6 +256,7 @@ class SSHTool:
                 timeout,
                 connection_mode,
                 gateway,
+                owner_id,
             )
             effective_chunk_size = _base64_chunk_size(chunk_size)
             with local.open("rb") as handle:
@@ -248,14 +270,14 @@ class SSHTool:
                         f"{encoded}\n"
                         f"{FILE_TRANSFER_HEREDOC}"
                     )
-                    self._execute_remote_command(host, append_command, timeout, connection_mode, gateway)
+                    self._execute_remote_command(host, append_command, timeout, connection_mode, gateway, owner_id)
             finalize_command = (
                 f"base64 -d {shlex.quote(tmp_b64)} > {shlex.quote(remote_path)} && "
                 f"rm -f {shlex.quote(tmp_b64)} && "
                 f"sha256sum {shlex.quote(remote_path)} | awk '{{print $1}}'"
             )
             remote_digest = _first_output_token(
-                self._execute_remote_command(host, finalize_command, timeout, connection_mode, gateway).stdout
+                self._execute_remote_command(host, finalize_command, timeout, connection_mode, gateway, owner_id).stdout
             )
             if remote_digest != digest:
                 raise ToolExecutionError(f"remote sha256 mismatch: expected {digest}, got {remote_digest}")
@@ -282,15 +304,22 @@ class SSHTool:
         host: str,
         remote_path: str,
         local_path: str,
-        timeout: int = 300,
+        timeout: int = DEFAULT_COMMAND_TIMEOUT,
         confirmed: bool = False,
         connection_mode: str = "direct",
         gateway: Optional[str] = None,
+        owner_id: Optional[str] = None,
         max_bytes: int = DEFAULT_FILE_TRANSFER_MAX_BYTES,
     ) -> Dict[str, Any]:
         assessment = self.safety_policy.assess_tool(
             "ssh.file_pull",
-            {"connection_mode": connection_mode, "gateway": gateway, "remote_path": remote_path, "local_path": local_path},
+            {
+                "connection_mode": connection_mode,
+                "gateway": gateway,
+                "owner_id": owner_id,
+                "remote_path": remote_path,
+                "local_path": local_path,
+            },
         )
         audit_event = self._audit_event(
             "ssh.file_pull",
@@ -300,6 +329,7 @@ class SSHTool:
             {
                 "connection_mode": connection_mode,
                 "gateway": gateway,
+                "owner_id": owner_id,
                 "remote_path": remote_path,
                 "local_path": str(Path(local_path).expanduser()),
                 "max_bytes": max_bytes,
@@ -310,7 +340,7 @@ class SSHTool:
         started = time.monotonic()
         try:
             size_output = self._execute_remote_command(
-                host, f"wc -c < {shlex.quote(remote_path)}", timeout, connection_mode, gateway
+                host, f"wc -c < {shlex.quote(remote_path)}", timeout, connection_mode, gateway, owner_id
             ).stdout.strip()
             size = int(size_output.splitlines()[-1].strip())
             if size > max_bytes:
@@ -322,10 +352,11 @@ class SSHTool:
                     timeout,
                     connection_mode,
                     gateway,
+                    owner_id,
                 ).stdout
             )
             encoded = self._execute_remote_command(
-                host, f"base64 < {shlex.quote(remote_path)}", timeout, connection_mode, gateway
+                host, f"base64 < {shlex.quote(remote_path)}", timeout, connection_mode, gateway, owner_id
             ).stdout
             data = base64.b64decode("".join(encoded.split()), validate=False)
             digest = hashlib.sha256(data).hexdigest()
@@ -368,15 +399,20 @@ class SSHTool:
         timeout: int,
         connection_mode: str,
         gateway: Optional[str],
+        owner_id: Optional[str] = None,
     ) -> CommandResult:
         if connection_mode == "gateway":
             gateway_config = self._gateway_config(gateway)
-            return GatewaySSHRunner(gateway_config, matcher_registry=self._matcher_registry()).run_command(
-                host, command, timeout, None, self._record_audit
+            result = GatewaySSHRunner(gateway_config, matcher_registry=self._matcher_registry()).run_command(
+                host, command, timeout, None, self._record_audit, owner_id=owner_id
             )
+            _ensure_remote_command_succeeded(result)
+            return result
         if connection_mode != "direct":
             raise ToolExecutionError(f"Unsupported connection_mode: {connection_mode}")
-        return self._run(["ssh", *self._ssh_options(), self._target(host), command], timeout, None)
+        result = self._run(["ssh", *self._ssh_options(), self._target(host), command], timeout, None)
+        _ensure_remote_command_succeeded(result)
+        return result
 
     def _run(
         self,
@@ -390,6 +426,13 @@ class SSHTool:
             completed = subprocess.run(
                 command, input=input_text, text=True, capture_output=True, timeout=timeout, check=False
             )
+        except subprocess.TimeoutExpired as exc:
+            stderr = _coerce_timeout_output(exc.stderr)
+            message = f"command timed out after {timeout} seconds"
+            if stderr:
+                message = f"{message}\n{stderr}"
+            self._record_audit(audit_event, "timeout", time.monotonic() - started, returncode=124, error=message)
+            return CommandResult(command, 124, _coerce_timeout_output(exc.stdout), message)
         except subprocess.SubprocessError as exc:
             self._record_audit(audit_event, "error", time.monotonic() - started, error=str(exc))
             raise ToolExecutionError(str(exc)) from exc
@@ -495,6 +538,24 @@ def _file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _coerce_timeout_output(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def _ensure_remote_command_succeeded(result: CommandResult) -> None:
+    if result.returncode == 0:
+        return
+    detail = result.stderr.strip() or result.stdout.strip()
+    message = f"remote command failed with returncode {result.returncode}"
+    if detail:
+        message = f"{message}: {detail}"
+    raise ToolExecutionError(message)
 
 
 def _base64_chunk_size(chunk_size: int) -> int:

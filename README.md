@@ -138,6 +138,25 @@ gateway=ops-jumpserver   -> 运维 JumpServer / 环境
 
 建议运维类调用都显式传 `gateway`，这样审计日志能清楚记录 Agent 进入了哪个环境入口。
 
+## Agent 会话归属与残留清理
+
+通过 JumpServer gateway 执行命令时，Agent 可以给 SSH 工具传 `owner_id`，例如 `codex-thread-<id>`。
+
+`owner_id` 用来把本次 gateway SSH 子进程登记到本地运行目录：
+
+```text
+~/jumpserver-ssh-mcp/run/sessions/<owner_id>/
+```
+
+下一次同一个 `owner_id` 启动 gateway SSH 前，MCP 会先清理该 owner 下已超过 grace 时间的残留 child 进程。不同 owner 的记录不会被清理，因此不会误杀其他 Agent 或人工打开的 SSH。
+
+建议：
+
+- 每个 Agent 线程或任务使用稳定且唯一的 `owner_id`。
+- 不要复用其他 Agent 的 `owner_id`。
+- 正常结束、超时、`SIGINT`、`SIGTERM`、进程退出时，MCP 也会清理自己登记过的 gateway child。
+- `kill -9` 或系统崩溃无法触发进程内清理；下次同 owner 调用会尝试清理残留。
+
 ## Matcher 插件放在哪里
 
 内置通用 matcher 和 reference matcher 会随 Python 包一起分发，安装后默认可用：
